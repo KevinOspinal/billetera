@@ -1,33 +1,47 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "billetera-theme";
 
-function getInitialTheme() {
-  if (typeof window === "undefined") {
-    return "light";
-  }
+function resolveTheme(preferred) {
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored === "light" || stored === "dark") {
     return stored;
   }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return preferred;
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState(() => getInitialTheme());
+  const [theme, setTheme] = useState("light");
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
+    const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    setTheme(resolveTheme(preferred));
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     document.body.classList.toggle("dark", theme === "dark");
     window.localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
+  }, [hydrated, theme]);
 
   const toggleTheme = () => setTheme((current) => (current === "dark" ? "light" : "dark"));
   const isDark = theme === "dark";
+
+  if (!hydrated) {
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 px-3 py-1.5 text-xs font-medium text-slate-400 dark:border-slate-700 dark:text-slate-500">
+        Tema
+      </span>
+    );
+  }
 
   return (
     <button
