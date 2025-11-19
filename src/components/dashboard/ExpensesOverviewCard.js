@@ -2,7 +2,7 @@ import Card from "@/components/ui/Card";
 import ExpensesTabs from "./ExpensesTabs";
 import ExpensesByCategoryChart from "./ExpensesByCategoryChart";
 
-export default function ExpensesOverviewCard() {
+export default function ExpensesOverviewCard({ categories, currency }) {
   return (
     <Card className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -12,7 +12,7 @@ export default function ExpensesOverviewCard() {
         </div>
         <ExpensesTabs />
       </div>
-      <ExpensesByCategoryChart />
+      <ExpensesByCategoryChart categories={categories} currency={currency} />
     </Card>
   );
 }
