@@ -9,7 +9,7 @@
     @apply min-h-screen bg-slate-50 text-slate-900 antialiased transition-colors duration-300 ease-out;
   }
 
-  body.dark {
+  html.dark body {
     @apply bg-slate-900 text-slate-100;
   }
 

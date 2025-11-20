@@ -6,21 +6,16 @@ import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "billetera-theme";
 
-function resolveTheme(preferred) {
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") {
-    return stored;
-  }
-  return preferred;
-}
-
 export default function ThemeToggle() {
   const [theme, setTheme] = useState("light");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    const htmlHasDark = document.documentElement.classList.contains("dark");
     const preferred = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    setTheme(resolveTheme(preferred));
+    const initial = stored === "dark" || stored === "light" ? stored : htmlHasDark ? "dark" : preferred;
+    setTheme(initial);
     setHydrated(true);
   }, []);
 
@@ -28,7 +23,6 @@ export default function ThemeToggle() {
     if (!hydrated) return;
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
-    document.body.classList.toggle("dark", theme === "dark");
     window.localStorage.setItem(STORAGE_KEY, theme);
   }, [hydrated, theme]);
 

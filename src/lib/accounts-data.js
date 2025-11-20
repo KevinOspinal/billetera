@@ -8,38 +8,44 @@ function normalizeAccount(row) {
   };
 }
 
-async function getPrincipalSummary(accountId) {
-  if (!accountId) {
+async function getUserMonthlySummary(userId) {
+  if (!userId) {
     return { monthlyIncome: 0, monthlyExpenses: 0, net: 0, categories: [] };
   }
 
   const [totalsResult, categoriesResult] = await Promise.all([
     query(
       `SELECT
+          DATE_TRUNC('month', transaction_date) AS "month",
           COALESCE(SUM(CASE WHEN type = 'income' THEN amount END), 0) AS "totalIncome",
           COALESCE(SUM(CASE WHEN type = 'expense' THEN amount END), 0) AS "totalExpense"
          FROM transactions
-        WHERE account_id = $1
-          AND transaction_date >= DATE_TRUNC('month', CURRENT_DATE)`,
-      [accountId]
+        WHERE user_id = $1
+          AND deleted_at IS NULL
+     GROUP BY "month"
+     ORDER BY "month" DESC
+     LIMIT 1`,
+      [userId]
     ),
     query(
       `SELECT COALESCE(c.name, 'Sin categoría') AS label,
               SUM(t.amount) AS amount
          FROM transactions t
     LEFT JOIN categories c ON c.id = t.category_id
-        WHERE t.account_id = $1
+        WHERE t.user_id = $1
           AND t.type = 'expense'
+          AND t.deleted_at IS NULL
           AND t.transaction_date >= DATE_TRUNC('month', CURRENT_DATE)
      GROUP BY COALESCE(c.name, 'Sin categoría')
      ORDER BY amount DESC
      LIMIT 5`,
-      [accountId]
+      [userId]
     ),
   ]);
 
-  const monthlyIncome = Number(totalsResult.rows[0]?.totalIncome ?? 0);
-  const monthlyExpenses = Number(totalsResult.rows[0]?.totalExpense ?? 0);
+  const totals = totalsResult.rows[0] ?? {};
+  const monthlyIncome = Number(totals.totalIncome ?? 0);
+  const monthlyExpenses = Number(totals.totalExpense ?? 0);
 
   const categories = categoriesResult.rows.map((row) => ({
     label: row.label,
@@ -77,11 +83,17 @@ export async function getAccountsOverview(userId) {
     accounts[0] ??
     null;
 
-  const principalSummary = principalAccount ? await getPrincipalSummary(principalAccount.id) : { monthlyExpenses: 0, categories: [] };
+  const principalSummary = await getUserMonthlySummary(userId);
+  const syncedAccounts = accounts.map((account) => {
+    if (principalAccount && account.id === principalAccount.id) {
+      return { ...account, currentBalance: principalSummary.net };
+    }
+    return account;
+  });
 
   return {
-    accounts,
-    principalAccount,
+    accounts: syncedAccounts,
+    principalAccount: principalAccount ? { ...principalAccount, currentBalance: principalSummary.net } : null,
     principalSummary,
   };
 }

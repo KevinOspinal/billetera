@@ -52,7 +52,50 @@ async function getSummaryStats(userId) {
   };
 }
 
-async function getExpensesByCategory(userId) {
+async function getWeeklyIncomeExpenses(userId) {
+  const { rows } = await query(
+    `WITH weekly AS (
+        SELECT CEIL(EXTRACT(DAY FROM transaction_date) / 7.0)::int AS week,
+               SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income,
+               SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expense
+          FROM transactions
+         WHERE user_id = $1
+           AND transaction_date >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY week
+    )
+    SELECT week, income, expense
+      FROM weekly
+     ORDER BY week`,
+    [userId]
+  );
+
+  const today = new Date();
+  const currentWeek = Math.min(Math.max(Math.ceil(today.getDate() / 7), 1), 5);
+  const maxWeekFromData = rows.reduce((max, row) => Math.max(max, row.week ?? 0), 0);
+  const weeksToShow = Math.min(Math.max(currentWeek, maxWeekFromData, 1), 5);
+  const labels = Array.from({ length: weeksToShow }, (_, index) => `Sem ${index + 1}`);
+  const income = Array(weeksToShow).fill(0);
+  const expense = Array(weeksToShow).fill(0);
+
+  rows.forEach((row) => {
+    const index = Math.min(Math.max(row.week - 1, 0), labels.length - 1);
+    income[index] = Number(row.income ?? 0);
+    expense[index] = Number(row.expense ?? 0);
+  });
+
+  return { labels, income, expense };
+}
+
+async function getExpensesByCategory(userId, interval = "month") {
+  let filter = "t.transaction_date >= DATE_TRUNC('month', CURRENT_DATE)";
+  if (interval === "week") {
+    filter = "t.transaction_date >= CURRENT_DATE - INTERVAL '7 days'";
+  } else if (interval === "today") {
+    filter = "t.transaction_date >= CURRENT_DATE";
+  } else if (interval === "month30") {
+    filter = `t.transaction_date >= CURRENT_DATE - INTERVAL '${DAYS_WINDOW} days'`;
+  }
+
   const { rows } = await query(
     `SELECT
         COALESCE(c.name, 'Sin categoría') AS label,
@@ -62,7 +105,7 @@ async function getExpensesByCategory(userId) {
       WHERE t.user_id = $1
         AND t.type = 'expense'
         AND t.deleted_at IS NULL
-        AND t.transaction_date >= CURRENT_DATE - INTERVAL '${DAYS_WINDOW} days'
+        AND ${filter}
    GROUP BY COALESCE(c.name, 'Sin categoría')
    ORDER BY amount DESC
    LIMIT 5`,
@@ -124,19 +167,34 @@ export async function getDashboardData(userId) {
     throw new Error("userId inválido");
   }
 
-  const [currency, summary, categories, transactions] = await Promise.all([
+  const [currency, summary, monthCategories, weekCategories, todayCategories, transactions, weeklySeries] = await Promise.all([
     getUserCurrency(parsedUserId),
     getSummaryStats(parsedUserId),
-    getExpensesByCategory(parsedUserId),
+    getExpensesByCategory(parsedUserId, "month"),
+    getExpensesByCategory(parsedUserId, "week"),
+    getExpensesByCategory(parsedUserId, "today"),
     getRecentTransactions(parsedUserId),
+    getWeeklyIncomeExpenses(parsedUserId),
   ]);
 
   return {
     summary: { ...summary, currency },
-    expensesByCategory: categories,
+    expensesByCategory: {
+      month: monthCategories,
+      week: weekCategories,
+      today: todayCategories,
+    },
     recentTransactions: transactions.map((transaction) => ({
       ...transaction,
       currency: transaction.currency ?? currency,
     })),
+    weeklySeries,
   };
+}
+
+export async function getUserSummaryStats(userId) {
+  if (!userId) {
+    throw new Error("userId es requerido para obtener el resumen");
+  }
+  return getSummaryStats(userId);
 }

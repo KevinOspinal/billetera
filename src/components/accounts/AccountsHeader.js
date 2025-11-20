@@ -15,7 +15,7 @@ export default function AccountsHeader({ principal, summary, onAddAccount }) {
       </div>
 
       {principal ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
             <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Saldo disponible (ingresos - gastos)</p>
             <p className="text-lg font-semibold text-slate-900 dark:text-slate-50">{principal.name}</p>
@@ -36,13 +36,6 @@ export default function AccountsHeader({ principal, summary, onAddAccount }) {
                 </p>
               </div>
             </div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-            <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Saldo actual</p>
-            <p className="text-lg font-semibold text-slate-900 dark:text-slate-50">{principal.name}</p>
-            <p className="text-3xl font-bold text-slate-900 dark:text-slate-50">
-              {formatCurrency(principal.currentBalance, principal.currency)}
-            </p>
           </div>
           <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
             <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Gastos del mes</p>

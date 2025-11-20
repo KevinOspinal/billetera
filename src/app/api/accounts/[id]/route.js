@@ -3,14 +3,36 @@ import { query } from "@/lib/db";
 
 /**
  * Convierte el parámetro dinámico en entero y nos asegura que no se inyecten
- * strings o UUIDs inesperados. Si falla lanzamos y centralizamos el manejo abajo.
+ * strings o UUIDs inesperados. Si el enrutador no entrega `params.id`, tratamos de
+ * extraer el último segmento directamente desde la URL.
  */
-function ensureId(params) {
-  const { id } = params;
-  const accountId = Number(id);
-  if (!Number.isInteger(accountId)) {
+function ensureId(request, params = {}) {
+  let raw = params?.id;
+
+  if ((raw === undefined || raw === null) && request) {
+    try {
+      const url = request.nextUrl ?? new URL(request.url);
+      const segments = url.pathname.split("/").filter(Boolean);
+      raw = segments[segments.length - 1];
+    } catch {
+      raw = undefined;
+    }
+  }
+
+  if (raw === undefined || raw === null) {
     throw new Error("ID inválido");
   }
+
+  const normalized = typeof raw === "string" ? raw.trim() : String(raw);
+  if (!normalized) {
+    throw new Error("ID inválido");
+  }
+
+  const accountId = Number.parseInt(normalized, 10);
+  if (Number.isNaN(accountId)) {
+    throw new Error("ID inválido");
+  }
+
   return accountId;
 }
 
@@ -18,9 +40,9 @@ function ensureId(params) {
  * GET /api/accounts/:id → trae una única cuenta. Ideal para vistas de detalle o
  * formularios de edición que necesitan el snapshot actual.
  */
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   try {
-    const accountId = ensureId(params);
+    const accountId = ensureId(request, params);
     const { rows } = await query(
       `SELECT id, user_id AS "userId", name, type, currency, initial_balance AS "initialBalance",
               current_balance AS "currentBalance", status, created_at AS "createdAt"
@@ -48,7 +70,7 @@ export async function GET(_request, { params }) {
  */
 export async function PUT(request, { params }) {
   try {
-    const accountId = ensureId(params);
+    const accountId = ensureId(request, params);
     const body = await request.json();
     const fields = [];
     const values = [];
@@ -97,9 +119,9 @@ export async function PUT(request, { params }) {
  * DELETE /api/accounts/:id
  * - Operación idempotente: si no existe devolvemos 404, si se borra respondemos success.
  */
-export async function DELETE(_request, { params }) {
+export async function DELETE(request, { params }) {
   try {
-    const accountId = ensureId(params);
+    const accountId = ensureId(request, params);
     const { rows } = await query("DELETE FROM accounts WHERE id = $1 RETURNING id", [accountId]);
     if (!rows.length) {
       return notFound("Cuenta no encontrada");

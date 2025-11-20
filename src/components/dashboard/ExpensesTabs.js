@@ -6,6 +6,6 @@ const TABS = [
   { id: "today", label: "Hoy" },
 ];
 
-export default function ExpensesTabs() {
-  return <Tabs tabs={TABS} activeTab="month" />;
+export default function ExpensesTabs({ activeTab = "month", onChange }) {
+  return <Tabs tabs={TABS} activeTab={activeTab} onChange={onChange} />;
 }

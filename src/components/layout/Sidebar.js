@@ -13,7 +13,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar({ user }) {
   return (
-    <aside className="flex w-full flex-col gap-8 border-b border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 lg:h-screen lg:w-64 lg:border-b-0 lg:border-r lg:shadow-none">
+    <aside className="flex w-full flex-col gap-6 border-b border-slate-200/80 bg-white/80 p-6 shadow-lg shadow-slate-200/60 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/60 dark:shadow-slate-900/80 lg:h-screen lg:w-72 lg:border-b-0 lg:border-r">
       <SidebarUserInfo name={user?.name ?? "Invitado"} role={user?.email ?? "finanzas@billetera.com"} />
       <SidebarNav items={NAV_ITEMS} />
       <SidebarFooter />

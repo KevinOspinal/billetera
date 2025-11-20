@@ -1,16 +1,18 @@
 import BudgetCard from "./BudgetCard";
 
-const BUDGETS = [
-  { id: 1, category: "Comida", limit: 500, spent: 320 },
-  { id: 2, category: "Transporte", limit: 200, spent: 140 },
-  { id: 3, category: "Ocio", limit: 250, spent: 180 },
-];
+export default function BudgetsList({ budgets = [], currency = "COP", onEdit, onDelete }) {
+  if (!budgets.length) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white/70 p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
+        Aún no tienes presupuestos registrados. Crea uno para controlar tus gastos por categoría.
+      </div>
+    );
+  }
 
-export default function BudgetsList() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {BUDGETS.map((budget) => (
-        <BudgetCard key={budget.id} budget={budget} />
+      {budgets.map((budget) => (
+        <BudgetCard key={budget.id} budget={budget} currency={currency} onEdit={onEdit} onDelete={onDelete} />
       ))}
     </div>
   );

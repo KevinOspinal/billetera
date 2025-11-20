@@ -1,6 +1,24 @@
 import { badRequest, jsonResponse, serverError } from "@/lib/api";
 import { query, transaction } from "@/lib/db";
 
+async function getAccountForUser(accountId, userId) {
+  const { rows } = await query(
+    `SELECT id, user_id AS "userId", currency, current_balance AS "currentBalance", type
+       FROM accounts
+      WHERE id = $1 AND user_id = $2`,
+    [accountId, userId]
+  );
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+  return {
+    ...row,
+    userId: Number(row.userId),
+    currentBalance: Number(row.currentBalance ?? 0),
+  };
+}
+
 function parseId(value, field) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -30,23 +48,18 @@ export async function POST(request) {
     const notes = body.notes?.trim() || "";
     const transactionDate = body.transactionDate ?? new Date().toISOString().slice(0, 10);
 
-    const { rows: accountRows } = await query(
-      `SELECT id, user_id AS "userId", currency, current_balance AS "currentBalance"
-         FROM accounts
-        WHERE id = ANY($1::int[])`,
-      [[fromAccountId, toAccountId]]
-    );
+    const fromAccount = await getAccountForUser(fromAccountId, userId);
+    const toAccount = await getAccountForUser(toAccountId, userId);
 
-    if (accountRows.length !== 2) {
-      return badRequest("No se encontraron ambas cuentas");
+    if (!fromAccount || !toAccount) {
+      return badRequest("No se pudieron cargar las cuentas seleccionadas");
     }
-
-    const fromAccount = accountRows.find((account) => account.id === fromAccountId);
-    const toAccount = accountRows.find((account) => account.id === toAccountId);
 
     if (fromAccount.userId !== userId || toAccount.userId !== userId) {
       return badRequest("Las cuentas no pertenecen al usuario");
     }
+
+    const isCreditDestination = toAccount.type === "credit";
 
     await transaction(async (client) => {
       await client.query(
@@ -57,13 +70,19 @@ export async function POST(request) {
 
       await client.query("UPDATE accounts SET current_balance = current_balance - $1 WHERE id = $2", [amount, fromAccountId]);
 
+      const destinationType = isCreditDestination ? "transfer" : "income";
+
       await client.query(
         `INSERT INTO transactions (user_id, account_id, category_id, type, amount, currency, description, notes, transaction_date)
-         VALUES ($1, $2, NULL, 'income', $3, $4, $5, $6, $7)`,
-        [userId, toAccountId, amount, toAccount.currency, description, notes, transactionDate]
+         VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8)`,
+        [userId, toAccountId, destinationType, amount, toAccount.currency, description, notes, transactionDate]
       );
 
-      await client.query("UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2", [amount, toAccountId]);
+      if (isCreditDestination) {
+        await client.query("UPDATE accounts SET current_balance = current_balance - $1 WHERE id = $2", [amount, toAccountId]);
+      } else {
+        await client.query("UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2", [amount, toAccountId]);
+      }
     });
 
     const { rows: updatedAccounts } = await query(

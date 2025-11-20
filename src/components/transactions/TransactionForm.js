@@ -9,6 +9,7 @@ import Select from "@/components/ui/Select";
 import TextArea from "@/components/ui/TextArea";
 import TransactionField from "./TransactionField";
 import TransactionTypeToggle from "./TransactionTypeToggle";
+import { formatCurrency } from "@/lib/format";
 
 function buildOptions(items = []) {
   return items.map((item) => ({
@@ -17,7 +18,14 @@ function buildOptions(items = []) {
   }));
 }
 
-export default function TransactionForm({ accounts = [], categories = [], defaultType = "expense", userId }) {
+export default function TransactionForm({
+  accounts = [],
+  categories = [],
+  defaultType = "expense",
+  userId,
+  availableBalance = 0,
+  currency = "COP",
+}) {
   const router = useRouter();
   const [type, setType] = useState(defaultType);
   const accountOptions = useMemo(() => buildOptions(accounts), [accounts]);
@@ -91,6 +99,13 @@ export default function TransactionForm({ accounts = [], categories = [], defaul
       return;
     }
 
+    if (type === "expense" && amount > availableBalance) {
+      setError(
+        `No puedes registrar un gasto mayor a tu saldo disponible (${formatCurrency(availableBalance, currency)}).`
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -136,11 +151,19 @@ export default function TransactionForm({ accounts = [], categories = [], defaul
           <TransactionTypeToggle value={type} onChange={setType} />
         </div>
 
-        {!hasAccounts || !hasCategories ? (
+        <div className="space-y-3">
+          {!hasAccounts || !hasCategories ? (
           <p className="rounded-xl border border-amber-200/70 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
             Necesitas crear al menos una cuenta y una categoría para registrar movimientos.
           </p>
-        ) : null}
+          ) : null}
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Saldo disponible actual:{" "}
+            <span className="font-semibold text-slate-900 dark:text-slate-100">
+              {formatCurrency(availableBalance, currency)}
+            </span>
+          </p>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <TransactionField label="Concepto">
